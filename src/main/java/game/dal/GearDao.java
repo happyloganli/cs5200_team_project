@@ -2,6 +2,8 @@ package game.dal;
 
 import game.model.*;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class GearDao {
     protected ConnectionManager connectionManager;
@@ -114,5 +116,81 @@ public class GearDao {
             }
         }
         return null;
+    }
+    
+    public Gear updateDescription(Gear gearItem, String newDescription) throws SQLException {
+        String updateGear = "UPDATE Item SET ItemName=? WHERE ItemID=?;";
+        Connection connection = null;
+        PreparedStatement updateStmt = null;
+        try {
+            connection = connectionManager.getConnection();
+            updateStmt = connection.prepareStatement(updateGear);
+            updateStmt.setString(1, newDescription);
+            updateStmt.setInt(2, gearItem.getItemID());
+            updateStmt.executeUpdate();
+            gearItem.setItemName(newDescription);
+            return gearItem;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (connection != null) {
+                connection.close();
+            }
+            if (updateStmt != null) {
+                updateStmt.close();
+            }
+        }
+    }
+    
+    public List<Gear> getGearByPartialName(String name) throws SQLException {
+        List<Gear> gearList = new ArrayList<Gear>();
+        String selectGear = 
+            "SELECT Item.ItemID, Item.ItemName, Item.MaxStackSize, Item.IsSellable, Item.VendorPrice, " +
+            "Item.ItemLevel, Equipment.RequiredLevel, Gear.EquipSlotID, Gear.DefenseRating, Gear.MagicDefenseRating " +
+            "FROM Item " +
+            "INNER JOIN Equipment ON Item.ItemID = Equipment.ItemID " +
+            "INNER JOIN Gear ON Equipment.ItemID = Gear.ItemID " +
+            "WHERE Item.ItemName LIKE ?;";
+        Connection connection = null;
+        PreparedStatement selectStmt = null;
+        ResultSet results = null;
+        try {
+            connection = connectionManager.getConnection();
+            selectStmt = connection.prepareStatement(selectGear);
+            selectStmt.setString(1, "%" + name + "%");
+            results = selectStmt.executeQuery();
+            while (results.next()) {
+                int itemID = results.getInt("ItemID");
+                String itemName = results.getString("ItemName");
+                int maxStackSize = results.getInt("MaxStackSize");
+                boolean isSellable = results.getBoolean("IsSellable");
+                Integer vendorPrice = results.getObject("VendorPrice") != null ? results.getInt("VendorPrice") : null;
+                int itemLevel = results.getInt("ItemLevel");
+                int requiredLevel = results.getInt("RequiredLevel");
+                int equipSlotID = results.getInt("EquipSlotID");
+                Integer defenseRating = results.getObject("DefenseRating") != null ? results.getInt("DefenseRating") : null;
+                Integer magicDefenseRating = results.getObject("MagicDefenseRating") != null ? results.getInt("MagicDefenseRating") : null;
+
+                EquipmentSlotDao equipmentSlotDao = EquipmentSlotDao.getInstance();
+                EquipmentSlot equipSlot = equipmentSlotDao.getEquipmentSlotByID(equipSlotID);
+                Gear gear = new Gear(itemID, itemName, maxStackSize, isSellable, vendorPrice, itemLevel, requiredLevel, equipSlot, defenseRating, magicDefenseRating);
+                gearList.add(gear);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (connection != null) {
+                connection.close();
+            }
+            if (selectStmt != null) {
+                selectStmt.close();
+            }
+            if (results != null) {
+                results.close();
+            }
+        }
+        return gearList;
     }
 }
